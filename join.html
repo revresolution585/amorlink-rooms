@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en" referrerpolicy="origin">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AmorLink Rooms</title>
+    <style>
+      :root { --card:#ffffff; --border:#e5e7eb; --text:#111827; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:#f8fafc; }
+      .bar { position:sticky; top:0; background:var(--card); padding:12px; display:flex; gap:12px; align-items:center; border-bottom:1px solid var(--border); z-index:10; }
+      .grid { display:flex; gap:12px; flex-wrap:wrap; padding:12px; }
+      video { width:240px; max-width:46vw; border-radius:12px; background:#000; }
+      .status { font-weight:700; }
+      button { padding:10px 14px; border-radius:8px; font-weight:700; cursor:pointer; border:1px solid var(--border); background:#fff; }
+      .roomtag { margin-left:auto; opacity:0.7; font-size:14px; }
+    </style>
+    <script src="https://unpkg.com/livekit-client/dist/livekit-client.umd.min.js"></script>
+  </head>
+  <body>
+    <div class="bar">
+      <button id="join">Join with Camera & Mic</button>
+      <button id="leave" disabled>Leave</button>
+      <span class="status" id="status">idle</span>
+      <span id="err" style="color:crimson"></span>
+      <span class="roomtag" id="roomtag"></span>
+    </div>
+    <div id="grid" class="grid"></div>
+
+    <script>
+      const grid   = document.getElementById('grid');
+      const joinBt = document.getElementById('join');
+      const leaveBt= document.getElementById('leave');
+      const status = document.getElementById('status');
+      const errEl  = document.getElementById('err');
+      const tagEl  = document.getElementById('roomtag');
+
+      const params = new URLSearchParams(location.search);
+      const uiRoomId = params.get('rid') || 'amorlink-sandbox';
+      tagEl.textContent = "Room: " + uiRoomId;
+
+      let room = null;
+      let parentOrigin = (new URL(document.referrer || location.href)).origin;
+
+      function setStatus(s, e) {
+        status.textContent = s;
+        errEl.textContent = e ? (' — ' + e) : '';
+      }
+
+      function requestToken() {
+        window.parent.postMessage({ type:'REQUEST_TOKEN' }, parentOrigin);
+      }
+
+      window.addEventListener('message', async (e) => {
+        if (e.origin !== parentOrigin) return;
+        const { type, payload, message } = e.data || {};
+        if (type === 'TOKEN') {
+          try {
+            const { token, url } = payload;
+            await connectLiveKit(url, token);
+          } catch (err) {
+            setStatus('error', String(err));
+            joinBt.disabled = false;
+          }
+        }
+        if (type === 'TOKEN_ERROR') {
+          setStatus('error', message || 'token error');
+          joinBt.disabled = false;
+        }
+      });
+
+      async function connectLiveKit(serverUrl, token) {
+        setStatus('connecting');
+        const { Room, createLocalTracks, RoomEvent } = window.LivekitClient;
+        room = new Room();
+        const tracks = await createLocalTracks({ audio:true, video:true });
+        await room.connect(serverUrl, token, { tracks });
+        setStatus('connected');
+
+        room.localParticipant.trackPublications.forEach(pub => {
+          const t = pub.track; if (!t || t.kind !== 'video') return;
+          const el = t.attach(); el.muted = true; el.playsInline = true; el.autoplay = true;
+          grid.prepend(el);
+        });
+
+        function attach(pub){
+          const t = pub.track; if (!t || t.kind === 'audio') return;
+          const el = t.attach(); el.playsInline = true; el.autoplay = true;
+          el.style.width='240px'; el.style.borderRadius='12px';
+          grid.appendChild(el);
+        }
+        function detach(pub){ pub.track?.detach()?.forEach(el => el.remove()); }
+
+        room.on(RoomEvent.TrackSubscribed, (_t, pub) => attach(pub));
+        room.on(RoomEvent.TrackUnsubscribed, (_t, pub) => detach(pub));
+
+        room.participants.forEach(p => p.trackPublications.forEach(pub => { if (pub.isSubscribed) attach(pub); }));
+
+        joinBt.disabled = true;
+        leaveBt.disabled = false;
+      }
+
+      function leave() {
+        try { room?.disconnect(); } catch {}
+        room = null;
+        grid.querySelectorAll('video,audio').forEach(el => el.remove());
+        joinBt.disabled = false;
+        leaveBt.disabled = true;
+        setStatus('idle');
+      }
+
+      joinBt.addEventListener('click', () => { joinBt.disabled = true; setStatus('requesting token'); requestToken(); });
+      leaveBt.addEventListener('click', leave);
+      window.addEventListener('beforeunload', leave);
+    </script>
+  </body>
+</html>
