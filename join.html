@@ -120,11 +120,26 @@
            window.parent.postMessage({ type: 'LK_STATE', state: state }, parentOrigin);
         });
 
+        let localTracks = [];
         try {
            console.log('[IFRAME] Attempting connection to:', serverUrl, 'with room:', uiRoomId);
-           const tracks = await createLocalTracks({ audio:true, video:true });
-           console.log('[IFRAME] Local tracks created, connecting to room...');
-           await room.connect(serverUrl, token, { tracks });
+           localTracks = await createLocalTracks({ audio:true, video:true });
+           console.log('[IFRAME] Local tracks created:', localTracks.length);
+
+           // Attach local video immediately
+           localTracks.forEach(track => {
+             if (track.kind === 'video') {
+               const el = track.attach();
+               el.muted = true;
+               el.playsInline = true;
+               el.autoplay = true;
+               grid.prepend(el);
+               console.log('[IFRAME] Local video track attached');
+             }
+           });
+
+           console.log('[IFRAME] Connecting to room...');
+           await room.connect(serverUrl, token, { tracks: localTracks });
            setStatus('connected');
            console.log('[IFRAME] Successfully connected to LiveKit room');
          } catch (e) {
@@ -132,14 +147,6 @@
            window.parent.postMessage({ type: 'LK_ERROR', reason: `${e.message || String(e)}` }, parentOrigin);
            throw e;
          }
-
-        if (room.localParticipant?.trackPublications) {
-          Array.from(room.localParticipant.trackPublications.values()).forEach(pub => {
-            const t = pub.track; if (!t || t.kind !== 'video') return;
-            const el = t.attach(); el.muted = true; el.playsInline = true; el.autoplay = true;
-            grid.prepend(el);
-          });
-        }
 
         function attach(pub){
           const t = pub.track; if (!t || t.kind === 'audio') return;
