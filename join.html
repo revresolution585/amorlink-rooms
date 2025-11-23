@@ -149,19 +149,53 @@
          }
 
         function attach(pub){
-          const t = pub.track; if (!t || t.kind === 'audio') return;
-          const el = t.attach(); el.playsInline = true; el.autoplay = true;
-          el.style.width='240px'; el.style.borderRadius='12px';
+          const t = pub.track; if (!t) return;
+          const el = t.attach(); 
+          el.playsInline = true; 
+          el.autoplay = true;
+          if (t.kind === 'video') {
+            el.style.width='240px'; 
+            el.style.borderRadius='12px';
+          }
           grid.appendChild(el);
+          console.log('[IFRAME] Attached', t.kind, 'track from', pub.trackSid);
         }
-        function detach(pub){ pub.track?.detach()?.forEach(el => el.remove()); }
-
-        room.on(RoomEvent.TrackSubscribed, (_t, pub) => attach(pub));
-        room.on(RoomEvent.TrackUnsubscribed, (_t, pub) => detach(pub));
-
-        if (room.participants) {
-          Array.from(room.participants.values()).forEach(p => Array.from(p.trackPublications.values()).forEach(pub => { if (pub.isSubscribed) attach(pub); }));
+        function detach(pub){ 
+          pub.track?.detach()?.forEach(el => el.remove()); 
+          console.log('[IFRAME] Detached track', pub.trackSid);
         }
+
+        room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
+          console.log('[IFRAME] TrackSubscribed:', track.kind, 'from', participant.identity);
+          attach(pub);
+        });
+        room.on(RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
+          console.log('[IFRAME] TrackUnsubscribed:', track.kind, 'from', participant.identity);
+          detach(pub);
+        });
+
+        room.on(RoomEvent.ParticipantConnected, (participant) => {
+          console.log('[IFRAME] Participant connected:', participant.identity);
+        });
+
+        // Display existing participants
+        if (room.remoteParticipants) {
+          console.log('[IFRAME] Found', room.remoteParticipants.size, 'existing remote participants');
+          Array.from(room.remoteParticipants.values()).forEach(participant => {
+            console.log('[IFRAME] Processing participant:', participant.identity);
+            participant.trackPublications.forEach(pub => { 
+              console.log('[IFRAME] Track publication:', pub.trackSid, 'subscribed:', pub.isSubscribed, 'track:', !!pub.track);
+              if (pub.isSubscribed && pub.track) {
+                console.log('[IFRAME] Attaching existing track:', pub.track.kind);
+                attach(pub); 
+              }
+            });
+          });
+        }
+
+        // Log all room participants after connection
+        console.log('[IFRAME] Local participant:', room.localParticipant?.identity);
+        console.log('[IFRAME] Remote participants count:', room.remoteParticipants?.size || 0);
 
         joinBt.disabled = true;
         leaveBt.disabled = false;
