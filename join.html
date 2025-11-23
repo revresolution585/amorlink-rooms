@@ -133,11 +133,13 @@
            throw e;
          }
 
-        Array.from(room.localParticipant.trackPublications.values()).forEach(pub => {
-          const t = pub.track; if (!t || t.kind !== 'video') return;
-          const el = t.attach(); el.muted = true; el.playsInline = true; el.autoplay = true;
-          grid.prepend(el);
-        });
+        if (room.localParticipant?.trackPublications) {
+          Array.from(room.localParticipant.trackPublications.values()).forEach(pub => {
+            const t = pub.track; if (!t || t.kind !== 'video') return;
+            const el = t.attach(); el.muted = true; el.playsInline = true; el.autoplay = true;
+            grid.prepend(el);
+          });
+        }
 
         function attach(pub){
           const t = pub.track; if (!t || t.kind === 'audio') return;
@@ -150,7 +152,9 @@
         room.on(RoomEvent.TrackSubscribed, (_t, pub) => attach(pub));
         room.on(RoomEvent.TrackUnsubscribed, (_t, pub) => detach(pub));
 
-        Array.from(room.participants.values()).forEach(p => Array.from(p.trackPublications.values()).forEach(pub => { if (pub.isSubscribed) attach(pub); }));
+        if (room.participants) {
+          Array.from(room.participants.values()).forEach(p => Array.from(p.trackPublications.values()).forEach(pub => { if (pub.isSubscribed) attach(pub); }));
+        }
 
         joinBt.disabled = true;
         leaveBt.disabled = false;
