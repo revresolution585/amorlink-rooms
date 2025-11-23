@@ -183,13 +183,17 @@
           console.log('[IFRAME] Found', room.remoteParticipants.size, 'existing remote participants');
           Array.from(room.remoteParticipants.values()).forEach(participant => {
             console.log('[IFRAME] Processing participant:', participant.identity);
-            participant.trackPublications.forEach(pub => { 
-              console.log('[IFRAME] Track publication:', pub.trackSid, 'subscribed:', pub.isSubscribed, 'track:', !!pub.track);
-              if (pub.isSubscribed && pub.track) {
-                console.log('[IFRAME] Attaching existing track:', pub.track.kind);
-                attach(pub); 
-              }
-            });
+            console.log('[IFRAME] Participant tracks:', participant.trackPublications?.size || 0);
+
+            if (participant.trackPublications) {
+              Array.from(participant.trackPublications.values()).forEach(pub => { 
+                console.log('[IFRAME] Track publication:', pub.trackSid, 'kind:', pub.kind, 'subscribed:', pub.isSubscribed, 'track:', !!pub.track);
+                if (pub.isSubscribed && pub.track) {
+                  console.log('[IFRAME] Attaching existing track:', pub.track.kind);
+                  attach(pub); 
+                }
+              });
+            }
           });
         }
 
