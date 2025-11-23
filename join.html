@@ -133,7 +133,7 @@
            throw e;
          }
 
-        room.localParticipant.trackPublications.forEach(pub => {
+        Array.from(room.localParticipant.trackPublications.values()).forEach(pub => {
           const t = pub.track; if (!t || t.kind !== 'video') return;
           const el = t.attach(); el.muted = true; el.playsInline = true; el.autoplay = true;
           grid.prepend(el);
@@ -150,7 +150,7 @@
         room.on(RoomEvent.TrackSubscribed, (_t, pub) => attach(pub));
         room.on(RoomEvent.TrackUnsubscribed, (_t, pub) => detach(pub));
 
-        room.participants.forEach(p => p.trackPublications.forEach(pub => { if (pub.isSubscribed) attach(pub); }));
+        room.participants.forEach(p => Array.from(p.trackPublications.values()).forEach(pub => { if (pub.isSubscribed) attach(pub); }));
 
         joinBt.disabled = true;
         leaveBt.disabled = false;
